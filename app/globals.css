@@ -211,6 +211,43 @@ textarea {
   flex-wrap: wrap;
 }
 
+.local-tools-panel {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.local-tools-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.local-tools-field {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.local-tools-field select,
+.local-tools-field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+}
+
+.local-tools-message {
+  margin-top: 8px;
+}
+
+.local-tools-error {
+  margin-top: 8px;
+  color: var(--red);
+  font-size: 13px;
+}
+
 .muted {
   color: var(--muted);
   font-size: 13px;

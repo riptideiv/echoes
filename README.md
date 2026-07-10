@@ -87,6 +87,16 @@ Copy `.env.example` to `.env` for the full list of settings. The main options ar
 `CLAUDE_PROJECTS_DIR`, `DB_PATH`, `BROWSERS_CONFIG`, `GEN_TEMPERATURE`, and
 `TAG_TEMPERATURE`.
 
+## Local extensions
+
+Echoes can load an optional trusted local extension without adding that extension to this
+repository. Set `ECHOES_EXTENSION_PATH` in `.env.local` to the absolute path of an ESM module
+that implements extension API v1. With no extension configured, the local-tools API and UI stay
+disabled. See [`lib/extensions/types.ts`](lib/extensions/types.ts) for the versioned contract.
+
+Local extensions run with the same operating-system permissions as Echoes. Only configure code
+you trust.
+
 ## Privacy
 
 Session data, browser history, generated ideas, API keys, and personal browser configuration

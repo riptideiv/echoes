@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Star from "./Star";
+import LocalTools from "./LocalTools";
 import { VOICE_LABEL, type Idea } from "../types";
 
 export default function IdeaPreview({
@@ -154,6 +155,8 @@ export default function IdeaPreview({
             </div>
           </div>
         )}
+
+        <LocalTools ideaId={idea.id} />
 
         {(idea.status === "ready" || idea.status === "finalized") && (
           <div className="row">

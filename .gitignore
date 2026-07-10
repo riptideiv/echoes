@@ -9,3 +9,6 @@ data.db-*
 next-env.d.ts
 config/browsers.json
 history.json
+.echoes/
+*.extension.db
+*.extension.db-*
