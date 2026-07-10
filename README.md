@@ -1,6 +1,6 @@
 # Echoes of the Week
 
-Echoes of the Week is a private, local-first dashboard that turns the past seven days of your
+Echoes is a private, local-first dashboard that turns the past seven days of your
 Claude Code sessions and browsing history into grounded ideas for blog and LinkedIn posts.
 It groups related activity, ranks ideas by evidence and reader interest, and keeps everything
 in a local SQLite database.
