@@ -1,0 +1,19 @@
+{
+  "//": "Browser history sources to mine. Copy to config/browsers.json and edit paths.",
+  "//engine": "chromium = Chrome/Dia/Brave/Edge (History file); firefox = Zen/Firefox (places.sqlite); json = legacy Quick Export history.json",
+  "//paths": "~ and $HOME are expanded. Point at the DB file directly. Reads are read-only and safe while the browser is open.",
+  "sources": [
+    {
+      "name": "Dia",
+      "engine": "chromium",
+      "path": "~/Library/Application Support/Dia/User Data/Default/History",
+      "enabled": true
+    },
+    {
+      "name": "Zen",
+      "engine": "firefox",
+      "path": "~/Library/Application Support/zen/Profiles/<profile>.Default (release)/places.sqlite",
+      "enabled": true
+    }
+  ]
+}
