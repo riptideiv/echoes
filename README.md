@@ -1,6 +1,16 @@
-# Echoes of the Week
+<div align="center">
+<img width="500" alt="screenshot of the echoes app" src="https://github.com/user-attachments/assets/58120700-4627-459a-b126-e094cd778623" /><br>
+<h1>Echoes of the Week</h1>
+<img alt="GitHub" src="https://img.shields.io/github/license/riptideiv/echoes">
+<img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white">
+<img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
+<br>
+<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white">
+<img alt="SQLite" src="https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white">
+<img alt="DeepSeek" src="https://img.shields.io/badge/LLM-DeepSeek-4D6BFE?logo=deepseek&logoColor=white">
+</div>
 
-Echoes is a private, local-first dashboard that turns the past seven days of your
+A private, local-first dashboard that turns the past seven days of your
 Claude Code sessions and browsing history into grounded ideas for blog and LinkedIn posts.
 It groups related activity, ranks ideas by evidence and reader interest, and keeps everything
 in a local SQLite database.
@@ -14,6 +24,16 @@ in a local SQLite database.
 - Asks for missing personal context when an idea needs it
 - Supports favorites, filters, dismissals, and a date-based archive
 - Caches tags and themes to avoid repeat model calls
+
+```mermaid
+flowchart LR
+    A["Extract<br/>sessions + web history"] --> B["Tag<br/>LLM, cached per source"]
+    B --> C["Cluster<br/>group by shared tag"]
+    C --> D["Generate<br/>LLM, cached per theme"]
+    D --> E["Rank<br/>evidence x interest"]
+    E --> F[("SQLite<br/>data.db")]
+    F --> G["Dashboard"]
+```
 
 ## Requirements
 
@@ -69,16 +89,6 @@ Example:
 
 Paths support `~` and `$HOME`. Missing or inaccessible sources are skipped with a warning so
 the rest of the pipeline can continue.
-
-## How it works
-
-```text
-extract -> tag -> cluster -> generate ideas -> rank -> SQLite
-```
-
-Sources are tagged once and cached. A theme is keyed by the set of activities that produced it,
-so unchanged themes do not trigger another model call. Ideas are date-stamped and retained for
-later review.
 
 ## Configuration
 
