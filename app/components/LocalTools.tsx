@@ -94,72 +94,85 @@ export default function LocalTools({ ideaId }: { ideaId: number }) {
     }
   };
 
+  const panelBody = (panel: ExtensionPanel) => (
+    <>
+      {panel.fields.map((field) =>
+        field.type === "select" ? (
+          <label className="local-tools-field" key={field.id}>
+            <span>{field.label}</span>
+            <select
+              value={values[panel.id]?.[field.id] ?? ""}
+              onChange={(event) =>
+                setValues((current) => ({
+                  ...current,
+                  [panel.id]: {
+                    ...current[panel.id],
+                    [field.id]: event.target.value,
+                  },
+                }))
+              }
+            >
+              {field.options?.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label className="local-tools-field" key={field.id}>
+            <span>{field.label}</span>
+            <textarea
+              rows={field.rows ?? 8}
+              placeholder={field.placeholder}
+              value={values[panel.id]?.[field.id] ?? ""}
+              onChange={(event) =>
+                setValues((current) => ({
+                  ...current,
+                  [panel.id]: {
+                    ...current[panel.id],
+                    [field.id]: event.target.value,
+                  },
+                }))
+              }
+            />
+          </label>
+        )
+      )}
+      <div className="row">
+        {panel.actions.map((action) => {
+          const key = `${panel.id}:${action.id}`;
+          return (
+            <button
+              key={action.id}
+              className={action.variant === "primary" ? "primary" : ""}
+              disabled={busy !== null}
+              onClick={() => run(panel, action.id)}
+            >
+              {busy === key ? "Working…" : action.label}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
   return (
     <div className="local-tools section">
       <div className="label">{view?.displayName ?? "Local tools"}</div>
-      {view?.panels.map((panel) => (
-        <div className="local-tools-panel" key={panel.id}>
-          <div className="local-tools-title">{panel.title}</div>
-          {panel.fields.map((field) =>
-            field.type === "select" ? (
-              <label className="local-tools-field" key={field.id}>
-                <span>{field.label}</span>
-                <select
-                  value={values[panel.id]?.[field.id] ?? ""}
-                  onChange={(event) =>
-                    setValues((current) => ({
-                      ...current,
-                      [panel.id]: {
-                        ...current[panel.id],
-                        [field.id]: event.target.value,
-                      },
-                    }))
-                  }
-                >
-                  {field.options?.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <label className="local-tools-field" key={field.id}>
-                <span>{field.label}</span>
-                <textarea
-                  rows={field.rows ?? 8}
-                  placeholder={field.placeholder}
-                  value={values[panel.id]?.[field.id] ?? ""}
-                  onChange={(event) =>
-                    setValues((current) => ({
-                      ...current,
-                      [panel.id]: {
-                        ...current[panel.id],
-                        [field.id]: event.target.value,
-                      },
-                    }))
-                  }
-                />
-              </label>
-            )
-          )}
-          <div className="row">
-            {panel.actions.map((action) => {
-              const key = `${panel.id}:${action.id}`;
-              return (
-                <button
-                  key={action.id}
-                  className={action.variant === "primary" ? "primary" : ""}
-                  disabled={busy !== null}
-                  onClick={() => run(panel, action.id)}
-                >
-                  {busy === key ? "Working…" : action.label}
-                </button>
-              );
-            })}
+      {view?.panels.map((panel) =>
+        panel.presentation === "dropdown" ? (
+          <details className="local-tools-dropdown" key={panel.id}>
+            <summary>{panel.title}</summary>
+            <div className="local-tools-dropdown-body">{panelBody(panel)}</div>
+          </details>
+        ) : (
+          <div className="local-tools-panel" key={panel.id}>
+            <div className="local-tools-title">{panel.title}</div>
+            {panelBody(panel)}
           </div>
-        </div>
-      ))}
+        )
+      )}
       {message && <div className="muted local-tools-message">{message}</div>}
       {error && <div className="local-tools-error">{error}</div>}
     </div>
