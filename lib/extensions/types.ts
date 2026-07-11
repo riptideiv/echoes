@@ -40,6 +40,7 @@ export interface ExtensionAction {
 export interface ExtensionPanel {
   id: string;
   title: string;
+  presentation?: "card" | "dropdown";
   fields: ExtensionField[];
   actions: ExtensionAction[];
 }
