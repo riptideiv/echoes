@@ -9,6 +9,7 @@
 <img alt="SQLite" src="https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white">
 <img alt="DeepSeek" src="https://img.shields.io/badge/LLM-DeepSeek-4D6BFE?logo=deepseek&logoColor=white">
 </div>
+<br>
 
 A private, local-first dashboard that turns the past seven days of your
 Claude Code sessions and browsing history into grounded ideas for blog and LinkedIn posts.
