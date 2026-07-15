@@ -12,3 +12,4 @@ history.json
 .echoes/
 *.extension.db
 *.extension.db-*
+.fuse_hidden*

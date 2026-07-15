@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "tsx --test test/**/*.test.ts",
     "start": "next start",
     "generate": "tsx scripts/generate-daily.ts"
   },
