@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { CLAUDE_PROJECTS_DIR, WINDOW_DAYS } from "./config";
 import { readAllHistory } from "./browser-history";
+import { extractCodexSessions } from "./codex-extract";
 import type { Source } from "./types";
 
 const WINDOW_MS = WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -268,5 +269,7 @@ export function extractWebSources(): Source[] {
 }
 
 export function extractAllSources(): Source[] {
-  return [...extractSessions(), ...extractWebSources()];
+  return [...extractSessions(), ...extractCodexSessions(), ...extractWebSources()];
 }
+
+export { extractCodexSessions } from "./codex-extract";
