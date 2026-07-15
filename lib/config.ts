@@ -12,6 +12,9 @@ export const CLAUDE_PROJECTS_DIR =
   process.env.CLAUDE_PROJECTS_DIR ??
   path.join(os.homedir(), ".claude", "projects");
 
+export const CODEX_HOME =
+  process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
+
 export const HISTORY_PATH =
   process.env.HISTORY_PATH ?? path.join(process.cwd(), "history.json");
 

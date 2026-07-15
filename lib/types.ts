@@ -1,8 +1,8 @@
 import type { Tag } from "./config";
 
-/** An atomic unit of activity: one Claude session or one browsing cluster. */
+/** An atomic unit of activity: one Claude/Codex session or one browsing cluster. */
 export interface Source {
-  id: string; // stable id: "session:<sessionId>" or "web:<slug>"
+  id: string; // stable id: "session:<claudeId>", "session:codex:<id>", or "web:<slug>"
   kind: "session" | "web";
   title: string; // short human label
   summary: string; // compact text fed to the tagger (token-conscious)
