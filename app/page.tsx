@@ -215,8 +215,8 @@ export default function Home() {
         </div>
       </div>
       <p className="sub">
-        Blog & LinkedIn post ideas mined from your Claude Code sessions and
-        browsing this week — ranked by evidence × interest.
+        Blog & LinkedIn post ideas mined from your Claude Code and Codex sessions,
+        plus browsing this week — ranked by evidence × interest.
       </p>
 
       {notice && <div className="banner">{notice}</div>}

@@ -12,13 +12,13 @@
 <br>
 
 A private, local-first dashboard that turns the past seven days of your
-Claude Code sessions and browsing history into grounded ideas for blog and LinkedIn posts.
+Claude Code and Codex sessions plus browsing history into grounded ideas for blog and LinkedIn posts.
 It groups related activity, ranks ideas by evidence and reader interest, and keeps everything
 in a local SQLite database.
 
 ## Features
 
-- Reads Claude Code sessions and browser history from local files
+- Reads Claude Code sessions, interactive Codex sessions, and browser history from local files
 - Clusters related activity into themes
 - Generates long-form and short-form post ideas with DeepSeek
 - Ranks ideas by evidence strength and predicted reader interest
@@ -91,11 +91,19 @@ Example:
 Paths support `~` and `$HOME`. Missing or inaccessible sources are skipped with a warning so
 the rest of the pipeline can continue.
 
+## Session sources
+
+Claude Code sessions are read from `~/.claude/projects`. Interactive Codex sessions are read
+from dated rollouts in `~/.codex/sessions`, archived rollouts in
+`~/.codex/archived_sessions`, and optional titles in `~/.codex/session_index.jsonl`.
+Override these roots with `CLAUDE_PROJECTS_DIR` and `CODEX_HOME`. Missing, unreadable, or
+malformed Codex data is skipped because its local JSONL format is not a documented public API.
+
 ## Configuration
 
 Copy `.env.example` to `.env` for the full list of settings. The main options are
 `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `WINDOW_DAYS`,
-`CLAUDE_PROJECTS_DIR`, `DB_PATH`, `BROWSERS_CONFIG`, `GEN_TEMPERATURE`, and
+`CLAUDE_PROJECTS_DIR`, `CODEX_HOME`, `DB_PATH`, `BROWSERS_CONFIG`, `GEN_TEMPERATURE`, and
 `TAG_TEMPERATURE`.
 
 ## Local extensions
@@ -110,7 +118,7 @@ you trust.
 
 ## Privacy
 
-Session data, browser history, generated ideas, API keys, and personal browser configuration
+Claude Code and Codex session data, browser history, generated ideas, API keys, and personal browser configuration
 stay local and are excluded by `.gitignore`. Only selected activity summaries are sent to the
 configured model API during tagging and idea generation.
 
