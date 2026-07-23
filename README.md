@@ -1,6 +1,6 @@
 <div align="center">
-<img width="500" alt="screenshot of the echoes app" src="https://github.com/user-attachments/assets/58120700-4627-459a-b126-e094cd778623" /><br>
-<h1>Echoes of the Week</h1>
+<img width="500" alt="screenshot of Echoes Report" src="https://github.com/user-attachments/assets/58120700-4627-459a-b126-e094cd778623" /><br>
+<h1>Echoes Report</h1>
 <img alt="GitHub" src="https://img.shields.io/github/license/riptideiv/echoes">
 <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white">
 <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
@@ -11,117 +11,130 @@
 </div>
 <br>
 
-A private, local-first dashboard that turns the past seven days of your
-Claude Code and Codex sessions plus browsing history into grounded ideas for blog and LinkedIn posts.
-It groups related activity, ranks ideas by evidence and reader interest, and keeps everything
-in a local SQLite database.
+Echoes Report is a private, local-first dashboard that turns recent Claude
+Code and Codex sessions plus browser history into grounded ideas for blog and
+LinkedIn posts. It groups related activity, ranks ideas by evidence and reader
+interest, and keeps its configuration and generated reports on your computer.
 
 ## Features
 
-- Reads Claude Code sessions, interactive Codex sessions, and browser history from local files
+- Reads Claude Code sessions, interactive Codex sessions, and selected browser profiles
+- Finds standard browser history locations and verifies real file access during setup
 - Clusters related activity into themes
 - Generates long-form and short-form post ideas with DeepSeek
 - Ranks ideas by evidence strength and predicted reader interest
-- Asks for missing personal context when an idea needs it
-- Supports favorites, filters, dismissals, and a date-based archive
+- Supports favorites, filters, dismissals, missing-context questions, and a date archive
 - Caches tags and themes to avoid repeat model calls
-
-```mermaid
-flowchart LR
-    A["Extract<br/>sessions + web history"] --> B["Tag<br/>LLM, cached per source"]
-    B --> C["Cluster<br/>group by shared tag"]
-    C --> D["Generate<br/>LLM, cached per theme"]
-    D --> E["Rank<br/>evidence x interest"]
-    E --> F[("SQLite<br/>data.db")]
-    F --> G["Dashboard"]
-```
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 20.17 or newer
 - A DeepSeek API key
-- At least one supported local activity source
+- At least one readable Claude, Codex, or browser-history source
 
-## Setup
-
-```bash
-npm install
-cp .env.example .env
-cp config/browsers.example.json config/browsers.json
-```
-
-Add your `DEEPSEEK_API_KEY` to `.env`, then update `config/browsers.json` with the browser
-profiles you want to read. Both files are ignored by Git.
-
-## Run
+## Build and run the packaged CLI
 
 ```bash
-npm run generate
-npm run dev
+npm ci
+npm run typecheck
+npm test
+npm run build
+node dist/cli/echoes-report.mjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000). You can also run the same pipeline from
-the dashboard with **Generate today's ideas**.
+The first run launches an interactive setup wizard. Later runs start the
+packaged production web app and print its loopback-only URL.
 
-## Browser history sources
+To prove that the built CLI works independently of the repository working
+directory:
 
-Echoes reads browser databases directly and never modifies them. Supported engines are:
-
-| Engine | Browsers | File |
-| --- | --- | --- |
-| `chromium` | Chrome, Dia, Brave, Edge, Arc | `History` |
-| `firefox` | Firefox, Zen | `places.sqlite` |
-| `json` | Legacy exported history | `history.json` |
-
-Example:
-
-```json
-{
-  "sources": [
-    {
-      "name": "Chrome",
-      "engine": "chromium",
-      "path": "~/Library/Application Support/Google/Chrome/Default/History",
-      "enabled": true
-    }
-  ]
-}
+```bash
+npm run smoke:dist
 ```
 
-Paths support `~` and `$HOME`. Missing or inaccessible sources are skipped with a warning so
-the rest of the pipeline can continue.
+The smoke test creates isolated fixture configuration, starts the app through
+`dist/cli/echoes-report.mjs`, checks the health endpoint and dashboard, and
+shuts it down without sending an API request.
+
+## CLI commands
+
+```text
+echoes-report [start] [--port <number>]
+echoes-report setup
+echoes-report doctor [--json]
+echoes-report --help
+echoes-report --version
+```
+
+- `setup` configures the DeepSeek key, session directories, and browser profiles.
+- `doctor` rechecks permissions and formats without printing private activity.
+- `start` is the default command and keeps the local server in the foreground.
+
+User state defaults to:
+
+```text
+~/Library/Application Support/com.riptideiv.echoes-report/
+```
+
+Set `ECHOES_REPORT_HOME` to override that location.
+
+## Browser history
+
+Echoes Report copies live SQLite databases and their WAL/SHM companions to a
+temporary directory before reading them. It never modifies the browser's
+database.
+
+The standard-location catalog covers every browser represented by the
+upstream `browser-history` catalog on its supported platforms:
+
+| Engine | Browsers |
+| --- | --- |
+| Chromium | Chromium, Google Chrome, Microsoft Edge, Opera, Opera GX, Brave, Vivaldi, Epic Privacy Browser, Arc, and Dia |
+| Firefox | Firefox, LibreWolf, and Zen |
+| Safari | Safari |
+| JSON | Manually added history exports |
+
+Browsers with multiple profiles are shown separately in setup. Custom history
+files can be added when a browser is installed outside its standard location.
+
+On macOS, Safari and some browser profiles may require Full Disk Access for
+the terminal application running Echoes Report. Run `echoes-report doctor`
+after changing that permission and restarting the terminal.
 
 ## Session sources
 
-Claude Code sessions are read from `~/.claude/projects`. Interactive Codex sessions are read
-from dated rollouts in `~/.codex/sessions`, archived rollouts in
-`~/.codex/archived_sessions`, and optional titles in `~/.codex/session_index.jsonl`.
-Override these roots with `CLAUDE_PROJECTS_DIR` and `CODEX_HOME`. Missing, unreadable, or
-malformed Codex data is skipped because its local JSONL format is not a documented public API.
+Claude Code sessions default to `~/.claude/projects`. Codex sessions default
+to `~/.codex`, including dated and archived rollouts. Setup accepts custom
+locations and verifies a representative JSONL session record before saving
+them.
 
-## Configuration
+## Development
 
-Copy `.env.example` to `.env` for the full list of settings. The main options are
-`DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `WINDOW_DAYS`,
-`CLAUDE_PROJECTS_DIR`, `CODEX_HOME`, `DB_PATH`, `BROWSERS_CONFIG`, `GEN_TEMPERATURE`, and
+The web application can still be run directly during development:
+
+```bash
+cp .env.example .env
+npm run dev
+```
+
+Environment variables override saved CLI configuration. The primary options
+are `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `WINDOW_DAYS`,
+`CLAUDE_PROJECTS_DIR`, `CODEX_HOME`, `DB_PATH`, `GEN_TEMPERATURE`, and
 `TAG_TEMPERATURE`.
-
-## Local extensions
-
-Echoes can load an optional trusted local extension without adding that extension to this
-repository. Set `ECHOES_EXTENSION_PATH` in `.env.local` to the absolute path of an ESM module
-that implements extension API v1. With no extension configured, the local-tools API and UI stay
-disabled. See [`lib/extensions/types.ts`](lib/extensions/types.ts) for the versioned contract.
-
-Local extensions run with the same operating-system permissions as Echoes. Only configure code
-you trust.
 
 ## Privacy
 
-Claude Code and Codex session data, browser history, generated ideas, API keys, and personal browser configuration
-stay local and are excluded by `.gitignore`. Only selected activity summaries are sent to the
-configured model API during tagging and idea generation.
+Claude and Codex session files, browser history, API keys, configuration, and
+generated reports remain local. Only selected activity summaries are sent to
+the configured model API during tagging and idea generation.
+
+## Third-party attribution
+
+The standard browser catalog is adapted from the Apache-2.0-licensed
+[`browser-history` project](https://github.com/browser-history/browser-history).
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt).
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Echoes Report is licensed under the [MIT License](LICENSE).

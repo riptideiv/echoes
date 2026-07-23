@@ -165,7 +165,11 @@ function parseCodexSession(file: string, titles: Map<string, string>, now: numbe
 }
 
 /** Read interactive Codex rollouts. The on-disk format is intentionally treated as best-effort. */
-export function extractCodexSessions(codexHome = CODEX_HOME, now = Date.now()): Source[] {
+export function extractCodexSessions(
+  codexHome: string | null = CODEX_HOME,
+  now = Date.now(),
+): Source[] {
+  if (!codexHome) return [];
   const titles = readTitles(codexHome);
   const files = [
     ...jsonlFiles(path.join(codexHome, "sessions")),

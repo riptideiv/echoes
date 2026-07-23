@@ -1,32 +1,65 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
-import dotenv from "dotenv";
+import {
+  BrowserSourceSchema,
+  type BrowserSource,
+} from "./config/schema";
+import { expandHome } from "@/cli/paths";
 
-// Load .env for both Next (redundant, harmless) and the standalone tsx script.
-dotenv.config({ path: path.join(process.cwd(), ".env") });
+function numberFromEnvironment(name: string, fallback: number): number {
+  const raw = process.env[name];
 
-export const WINDOW_DAYS = Number(process.env.WINDOW_DAYS ?? 7);
+  if (raw === undefined) return fallback;
 
-export const CLAUDE_PROJECTS_DIR =
-  process.env.CLAUDE_PROJECTS_DIR ??
-  path.join(os.homedir(), ".claude", "projects");
+  const value = Number(raw);
 
-export const CODEX_HOME =
-  process.env.CODEX_HOME ?? path.join(os.homedir(), ".codex");
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      `${name} must be a finite number; received ${JSON.stringify(raw)}`,
+    );
+  }
 
-export const HISTORY_PATH =
-  process.env.HISTORY_PATH ?? path.join(process.cwd(), "history.json");
+  return value;
+}
 
+export const ECHOES_REPORT_HOME =
+  expandHome(process.env.ECHOES_REPORT_HOME ?? process.cwd());
+export const ECHOES_REPORT_CONFIG =
+  expandHome(process.env.ECHOES_REPORT_CONFIG ??
+  path.join(ECHOES_REPORT_HOME, "config.json"));
 export const DB_PATH =
-  process.env.DB_PATH ?? path.join(process.cwd(), "data.db");
+  expandHome(process.env.DB_PATH ?? path.join(ECHOES_REPORT_HOME, "data.db"));
+
+export const WINDOW_DAYS = numberFromEnvironment("WINDOW_DAYS", 7);
 
 export const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY ?? "").trim();
 export const DEEPSEEK_BASE_URL =
   process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com";
 export const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
-export const GEN_TEMPERATURE = Number(process.env.GEN_TEMPERATURE ?? 0.8);
-export const TAG_TEMPERATURE = Number(process.env.TAG_TEMPERATURE ?? 0.2);
+
+function configuredDirectory(
+  name: string,
+  fallback: string,
+): string | null {
+  const raw = process.env[name];
+  if (raw === "" || raw === "null") return null;
+  return expandHome(raw ?? fallback);
+}
+
+export const CLAUDE_PROJECTS_DIR = configuredDirectory(
+  "CLAUDE_PROJECTS_DIR",
+  path.join(os.homedir(), ".claude", "projects"),
+);
+export const CODEX_HOME = configuredDirectory(
+  "CODEX_HOME",
+  path.join(os.homedir(), ".codex"),
+);
+
+export const GEN_TEMPERATURE = numberFromEnvironment("GEN_TEMPERATURE", 0.8);
+export const TAG_TEMPERATURE = numberFromEnvironment("TAG_TEMPERATURE", 0.2);
+
+export const PORT = numberFromEnvironment("PORT", 3000);
 
 // Fixed tag vocabulary. The LLM must pick from this set so that grouping keys
 // stay stable and cacheable. Tuned from the user's recent activity.
@@ -48,62 +81,80 @@ export const TAG_VOCAB = [
 
 export type Tag = (typeof TAG_VOCAB)[number];
 
-export function hasHistoryFile(): boolean {
-  try {
-    return fs.existsSync(HISTORY_PATH);
-  } catch {
-    return false;
-  }
-}
-
 // ---- browser history sources ---------------------------------------------
 
-export type BrowserEngine = "chromium" | "firefox" | "json";
+const BROWSERS_CONFIG = process.env.BROWSERS_CONFIG;
+const HISTORY_PATH =
+  expandHome(process.env.HISTORY_PATH ?? path.join(process.cwd(), "history.json"));
 
-export interface BrowserSource {
-  name: string;
-  engine: BrowserEngine;
-  path: string;
-  enabled?: boolean;
+function parseBrowserSources(
+  value: unknown,
+  label: string,
+): BrowserSource[] | null {
+  const parsed = BrowserSourceSchema.array().safeParse(value);
+  if (parsed.success) return parsed.data;
+  console.warn(`[config] ignored invalid browser sources from ${label}`);
+  return null;
 }
 
-const BROWSERS_CONFIG =
-  process.env.BROWSERS_CONFIG ??
-  path.join(process.cwd(), "config", "browsers.json");
-
-/** Expand a leading ~ or $HOME so config files can use portable paths. */
-function expandHome(p: string): string {
-  if (p === "~") return os.homedir();
-  if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
-  if (p.startsWith("$HOME/")) return path.join(os.homedir(), p.slice(6));
-  return p;
+function readBrowserSourcesFile(
+  filePath: string,
+): BrowserSource[] | null {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return parseBrowserSources(
+      Array.isArray(parsed) ? parsed : parsed?.browsers ?? parsed?.sources,
+      filePath,
+    );
+  } catch (error) {
+    console.warn(`[config] failed to read browser sources from ${filePath}:`, error);
+    return null;
+  }
 }
 
 /**
- * The browser history sources to mine. Read from config/browsers.json when
- * present; otherwise fall back to the legacy exported history.json so existing
- * setups keep working. Disabled sources are dropped here.
+ * Resolve the browser sources configured by the CLI. A JSON environment value
+ * is used by the packaged standalone server; file-based fallbacks preserve
+ * development and older hand-written configurations.
  */
 export function getBrowserSources(): BrowserSource[] {
   let sources: BrowserSource[] | null = null;
-  try {
-    if (fs.existsSync(BROWSERS_CONFIG)) {
-      const parsed = JSON.parse(fs.readFileSync(BROWSERS_CONFIG, "utf8"));
-      if (Array.isArray(parsed?.sources)) sources = parsed.sources;
+
+  const environmentSources = process.env.BROWSER_SOURCES_JSON;
+  if (environmentSources) {
+    try {
+      sources = parseBrowserSources(
+        JSON.parse(environmentSources),
+        "BROWSER_SOURCES_JSON",
+      );
+    } catch (error) {
+      console.warn("[config] failed to parse BROWSER_SOURCES_JSON:", error);
     }
-  } catch (e) {
-    console.warn(`[config] failed to read ${BROWSERS_CONFIG}:`, e);
+  }
+
+  if (!sources && BROWSERS_CONFIG) {
+    sources = readBrowserSourcesFile(expandHome(BROWSERS_CONFIG));
   }
 
   if (!sources) {
-    // Backward-compat: the old single-file export, if it still exists.
-    if (hasHistoryFile()) {
-      return [{ name: "export", engine: "json", path: HISTORY_PATH }];
-    }
-    return [];
+    sources = readBrowserSourcesFile(expandHome(ECHOES_REPORT_CONFIG));
   }
 
-  return sources
-    .filter((s) => s && s.enabled !== false && s.engine && s.path)
-    .map((s) => ({ ...s, path: expandHome(s.path) }));
+  if (!sources && fs.existsSync(HISTORY_PATH)) {
+    sources = [{
+      id: "legacy-json-history",
+      name: "Legacy JSON history export",
+      engine: "json",
+      path: HISTORY_PATH,
+      enabled: true,
+    }];
+  }
+
+  return (sources ?? [])
+    .filter((source) => source.enabled)
+    .map((source) => ({
+      ...source,
+      path: expandHome(source.path),
+    }));
 }

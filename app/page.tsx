@@ -173,7 +173,7 @@ export default function Home() {
   return (
     <main className="wrap wide">
       <div className="topbar">
-        <h1>🌊 Echoes of the Week</h1>
+        <h1>🌊 Echoes Report</h1>
         <div className="controls">
           {!savedOnly && dates.length > 0 && (
             <select

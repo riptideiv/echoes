@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { runDailyPipeline } from "../lib/pipeline";
 
 async function main() {

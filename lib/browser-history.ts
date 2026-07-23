@@ -2,7 +2,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import Database from "better-sqlite3";
-import { getBrowserSources, type BrowserSource } from "./config";
+import { getBrowserSources } from "./config";
+import type { BrowserSource } from "./config/schema";
 
 /** One raw browsing visit, normalized across engines. visitTime = Unix ms. */
 export interface HistoryEntry {
@@ -13,6 +14,9 @@ export interface HistoryEntry {
 
 // Chrome/WebKit epoch (1601-01-01) offset from Unix epoch, in milliseconds.
 const CHROMIUM_EPOCH_OFFSET_MS = 11644473600000;
+
+// Safari stores visit_time as seconds since 2001-01-01 (CFAbsoluteTime).
+const SAFARI_EPOCH_OFFSET_MS = 978307200000;
 
 /**
  * Copy a SQLite DB (plus any -wal/-shm siblings) to a temp location and open
@@ -95,6 +99,31 @@ function readJson(filePath: string, sinceMs: number): HistoryEntry[] {
   return entries.filter((e) => !e.visitTime || e.visitTime > sinceMs);
 }
 
+function readSafari(dbPath: string, sinceMs: number): HistoryEntry[] {
+  const { db, cleanup } = openCopy(dbPath);
+  try {
+    // visit_time is seconds since 2001-01-01; convert the Unix-ms cutoff.
+    const cutoff = (sinceMs - SAFARI_EPOCH_OFFSET_MS) / 1000;
+    const rows = db
+      .prepare(
+        `SELECT i.url AS url, v.title AS title, v.visit_time AS vt
+         FROM history_visits v
+         JOIN history_items i ON i.id = v.history_item
+         WHERE v.visit_time > ?
+         ORDER BY v.visit_time DESC`
+      )
+      .all(cutoff) as { url: string; title: string | null; vt: number }[];
+
+    return rows.map((row) => ({
+      url: row.url,
+      title: row.title ?? undefined,
+      visitTime: row.vt * 1000 + SAFARI_EPOCH_OFFSET_MS,
+    }));
+  } finally {
+    cleanup();
+  }
+}
+
 function readSource(src: BrowserSource, sinceMs: number): HistoryEntry[] {
   switch (src.engine) {
     case "chromium":
@@ -103,6 +132,8 @@ function readSource(src: BrowserSource, sinceMs: number): HistoryEntry[] {
       return readFirefox(src.path, sinceMs);
     case "json":
       return readJson(src.path, sinceMs);
+    case "safari":
+      return readSafari(src.path, sinceMs);
     default:
       console.warn(`[history] unknown engine "${src.engine}" for ${src.name}`);
       return [];
