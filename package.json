@@ -2,21 +2,35 @@
   "name": "echoes-report",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "bin": {
-    "echoes-report": "cli/index.mjs"
+    "echoes-report": "dist/cli/echoes-report.mjs"
   },
   "files": [
+    "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSES",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "test": "tsx --test test/**/*.test.ts",
+    "build": "npm run build:web && npm run stage:web && npm run build:cli",
+    "build:web": "next build",
+    "stage:web": "node scripts/stage-standalone.mjs",
+    "build:cli": "node scripts/build-cli.mjs",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "start": "next start",
     "generate": "tsx scripts/generate-daily.ts"
   },
+  "engines": {
+    "node": ">=20.17.0"
+  },
   "dependencies": {
+    "@inquirer/prompts": "^8.5.2",
     "better-sqlite3": "^11.8.1",
     "next": "^15.1.6",
     "react": "^19.0.0",
@@ -29,6 +43,7 @@
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "dotenv": "^16.4.7",
+    "esbuild": "^0.28.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

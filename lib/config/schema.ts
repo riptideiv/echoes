@@ -17,6 +17,8 @@ export const BrowserSourceSchema = z.object({
   enabled: z.boolean(),
 });
 
+export type BrowserSource = z.infer<typeof BrowserSourceSchema>;
+
 // Config
 
 export const ConfigV1Schema = z.object({
@@ -31,7 +33,7 @@ export const ConfigV1Schema = z.object({
 
   generation: z.object({
     windowDays: z.number().int().min(1).max(365),
-    provider: z.literal("deepseek"),
+    provider: z.string().min(1),
     baseUrl: z.string().url(),
     model: z.string().min(1),
     generationTemperature: z.number().min(0).max(2),
@@ -58,5 +60,4 @@ export const SecretsV1Schema = z.object({
   }),
 });
 
-export type EchoesReportSecretsV1 =
-  z.infer<typeof SecretsV1Schema>;
+export type EchoesReportSecretsV1 = z.infer<typeof SecretsV1Schema>;

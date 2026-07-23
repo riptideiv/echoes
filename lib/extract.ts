@@ -123,6 +123,7 @@ function truncate(s: string, n: number): string {
 }
 
 export function extractSessions(): Source[] {
+  if (!CLAUDE_PROJECTS_DIR) return [];
   let projectDirs: string[];
   try {
     projectDirs = fs.readdirSync(CLAUDE_PROJECTS_DIR);
