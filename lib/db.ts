@@ -25,6 +25,13 @@ export function db(): Database.Database {
       source_json TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS session_digests (
+      cache_key   TEXT PRIMARY KEY,
+      stage       TEXT NOT NULL,
+      digest_json TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS ideas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source_key TEXT NOT NULL,
@@ -78,20 +85,50 @@ export function getCachedTags(id: string): Tag[] | null {
   return row ? (JSON.parse(row.tags_json) as Tag[]) : null;
 }
 
-export function saveSourceTags(src: TaggedSource): void {
+export function saveSourceTags(src: TaggedSource, cacheId = src.id): void {
   db()
     .prepare(
       `INSERT INTO sources (id, kind, summary_json, tags_json, tagged_at)
        VALUES (@id, @kind, @summary_json, @tags_json, @tagged_at)
-       ON CONFLICT(id) DO UPDATE SET tags_json = excluded.tags_json`
+       ON CONFLICT(id) DO UPDATE SET
+         summary_json = excluded.summary_json,
+         tags_json = excluded.tags_json,
+         tagged_at = excluded.tagged_at`
     )
     .run({
-      id: src.id,
+      id: cacheId,
       kind: src.kind,
       summary_json: JSON.stringify({ title: src.title, summary: src.summary }),
       tags_json: JSON.stringify(src.tags),
       tagged_at: new Date().toISOString(),
     });
+}
+
+// ---- session digest cache ------------------------------------------------
+
+export function getSessionDigestCache(cacheKey: string): string | null {
+  const row = db()
+    .prepare("SELECT digest_json FROM session_digests WHERE cache_key = ?")
+    .get(cacheKey) as { digest_json: string } | undefined;
+  return row?.digest_json ?? null;
+}
+
+export function saveSessionDigestCache(
+  cacheKey: string,
+  stage: "chunk" | "rollup",
+  digestJson: string,
+): void {
+  db()
+    .prepare(
+      `INSERT INTO session_digests
+       (cache_key, stage, digest_json, created_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(cache_key) DO UPDATE SET
+         stage = excluded.stage,
+         digest_json = excluded.digest_json,
+         created_at = excluded.created_at`
+    )
+    .run(cacheKey, stage, digestJson, new Date().toISOString());
 }
 
 // ---- theme cache ----------------------------------------------------------
