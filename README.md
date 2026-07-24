@@ -108,6 +108,13 @@ to `~/.codex`, including dated and archived rollouts. Setup accepts custom
 locations and verifies a representative JSONL session record before saving
 them.
 
+For sessions active in the rolling seven-day window, Echoes Report summarizes
+the complete user-visible conversation: your messages and the agent's final
+answers. It excludes reasoning, progress commentary, tool calls, and tool
+output. Persisted Codex forks are supported, but ephemeral `/side` chats are
+not saved by Codex; use a normal task or `/fork` for conversations you want
+Echoes Report to retain.
+
 ## Development
 
 The web application can still be run directly during development:

@@ -3,7 +3,7 @@ import path from "path";
 import { CLAUDE_PROJECTS_DIR, WINDOW_DAYS } from "./config";
 import { readAllHistory } from "./browser-history";
 import { extractCodexSessions } from "./codex-extract";
-import type { Source } from "./types";
+import type { Source, TranscriptTurn } from "./types";
 
 const WINDOW_MS = WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
@@ -35,7 +35,7 @@ function textFromContent(content: unknown): string {
           !!c && typeof c === "object" && (c as any).type === "text"
       )
       .map((c) => c.text)
-      .join(" ");
+      .join("\n");
   }
   return "";
 }
@@ -50,7 +50,11 @@ function isRealUserText(t: string): boolean {
 }
 
 /** Parse one session .jsonl into a Source, or null if outside the window. */
-function parseSession(file: string, projectDir: string): Source | null {
+function parseSession(
+  file: string,
+  projectDir: string,
+  now: number,
+): Source | null {
   let raw: string;
   try {
     raw = fs.readFileSync(file, "utf8");
@@ -59,9 +63,8 @@ function parseSession(file: string, projectDir: string): Source | null {
   }
   let aiTitle: string | null = null;
   let firstPrompt: string | null = null;
-  const prompts: string[] = [];
-  let minTs = Infinity;
-  let maxTs = -Infinity;
+  const turns: TranscriptTurn[] = [];
+  const seenMessages = new Set<string>();
 
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
@@ -72,34 +75,60 @@ function parseSession(file: string, projectDir: string): Source | null {
       continue;
     }
     if (o.type === "ai-title" && o.aiTitle) aiTitle = o.aiTitle;
-    if (typeof o.timestamp === "string") {
-      const t = Date.parse(o.timestamp);
-      if (!Number.isNaN(t)) {
-        if (t < minTs) minTs = t;
-        if (t > maxTs) maxTs = t;
-      }
-    }
-    if (o.type === "user" && o.message && typeof o.message === "object") {
+    if (o.isSidechain === true) continue;
+    const timestamp = typeof o.timestamp === "string"
+      ? Date.parse(o.timestamp)
+      : Number.NaN;
+    if (Number.isNaN(timestamp)) continue;
+
+    if (
+      o.type === "user" &&
+      o.message &&
+      typeof o.message === "object" &&
+      o.message.role === "user"
+    ) {
       const t = textFromContent(o.message.content).trim();
       if (isRealUserText(t)) {
         if (!firstPrompt) firstPrompt = t;
-        if (prompts.length < 3) prompts.push(t);
+        const key = `user:${o.uuid ?? ""}:${t}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          turns.push({ role: "user", text: t, timestamp });
+        }
+      }
+    } else if (
+      o.type === "assistant" &&
+      o.message &&
+      typeof o.message === "object" &&
+      o.message.role === "assistant" &&
+      o.message.stop_reason === "end_turn"
+    ) {
+      const t = textFromContent(o.message.content).trim();
+      if (t) {
+        const key = `assistant:${o.message.id ?? o.uuid ?? ""}:${t}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          turns.push({ role: "assistant", text: t, timestamp });
+        }
       }
     }
   }
 
-  if (maxTs === -Infinity) return null;
-  if (Date.now() - maxTs > WINDOW_MS) return null; // last activity outside window
+  if (turns.length === 0) return null;
+  turns.sort((a, b) => a.timestamp - b.timestamp);
+  const minTs = turns[0].timestamp;
+  const maxTs = turns[turns.length - 1].timestamp;
+  if (now - maxTs > WINDOW_MS || maxTs - now > 5 * 60_000) return null;
 
   const project = decodeProject(projectDir);
   const sessionId = path.basename(file, ".jsonl");
   const title = aiTitle || firstPrompt?.slice(0, 70) || "(untitled session)";
-  const detail = prompts.map((p) => truncate(p, 180));
 
   const summary = [
+    "Claude Code session",
     `Project: ${project}`,
     `Title: ${title}`,
-    firstPrompt ? `First ask: ${truncate(firstPrompt, 240)}` : "",
+    `${turns.length} visible conversation turn(s)`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -110,10 +139,14 @@ function parseSession(file: string, projectDir: string): Source | null {
     title,
     summary,
     project,
-    detail: detail.length ? detail : [truncate(firstPrompt ?? title, 180)],
-    startTs: minTs === Infinity ? maxTs : minTs,
+    detail: turns.map((turn) =>
+      `${turn.role === "user" ? "User" : "Agent"}: ${truncate(turn.text, 240)}`
+    ),
+    startTs: minTs,
     endTs: maxTs,
     weight: 1,
+    transcript: turns,
+    sessionProvider: "claude",
   };
 }
 
@@ -122,17 +155,20 @@ function truncate(s: string, n: number): string {
   return clean.length > n ? clean.slice(0, n - 1) + "…" : clean;
 }
 
-export function extractSessions(): Source[] {
-  if (!CLAUDE_PROJECTS_DIR) return [];
+export function extractSessions(
+  claudeProjectsDir: string | null = CLAUDE_PROJECTS_DIR,
+  now = Date.now(),
+): Source[] {
+  if (!claudeProjectsDir) return [];
   let projectDirs: string[];
   try {
-    projectDirs = fs.readdirSync(CLAUDE_PROJECTS_DIR);
+    projectDirs = fs.readdirSync(claudeProjectsDir);
   } catch {
     return [];
   }
   const out: Source[] = [];
   for (const dir of projectDirs) {
-    const full = path.join(CLAUDE_PROJECTS_DIR, dir);
+    const full = path.join(claudeProjectsDir, dir);
     let files: string[];
     try {
       if (!fs.statSync(full).isDirectory()) continue;
@@ -142,7 +178,7 @@ export function extractSessions(): Source[] {
     }
     for (const f of files) {
       if (!f.endsWith(".jsonl")) continue; // skips subagents/ subdir too
-      const src = parseSession(path.join(full, f), dir);
+      const src = parseSession(path.join(full, f), dir, now);
       if (src) out.push(src);
     }
   }

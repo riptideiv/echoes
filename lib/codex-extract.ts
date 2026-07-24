@@ -1,13 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { CODEX_HOME, WINDOW_DAYS } from "./config";
-import type { Source } from "./types";
+import type { Source, TranscriptTurn } from "./types";
 
 const WINDOW_MS = WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 interface Candidate {
   source: Source;
-  promptCount: number;
+  turnCount: number;
 }
 
 function truncate(value: string, length: number): string {
@@ -15,21 +15,27 @@ function truncate(value: string, length: number): string {
   return clean.length > length ? `${clean.slice(0, length - 1)}…` : clean;
 }
 
-function userText(value: unknown): string {
+function messageText(value: unknown, acceptedTypes: Set<string>): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
   return value
     .filter((item): item is { type: string; text: string } =>
       !!item && typeof item === "object" &&
-      (item as any).type === "text" && typeof (item as any).text === "string")
+      acceptedTypes.has((item as any).type) &&
+      typeof (item as any).text === "string")
     .map((item) => item.text)
-    .join(" ");
+    .join("\n");
 }
 
-function meaningfulPrompt(value: string): boolean {
+function meaningfulUserText(value: string): boolean {
   const text = value.trim();
   if (!text || text.startsWith("<") || text.startsWith("[Image")) return false;
   return !/^(Caveat:|You are Codex\b|A previous agent produced the plan below)/i.test(text);
+}
+
+function meaningfulAssistantText(value: string): boolean {
+  const text = value.trim();
+  return Boolean(text) && !text.startsWith("<");
 }
 
 function containsMarker(value: unknown, marker: RegExp): boolean {
@@ -44,7 +50,6 @@ function containsMarker(value: unknown, marker: RegExp): boolean {
 
 function excludedSession(meta: any): boolean {
   const payload = meta?.payload ?? {};
-  if (payload.parent_thread_id) return true;
   const provenance = [payload.source, payload.thread_source, payload.originator];
   return provenance.some((value) =>
     containsMarker(value, /(subagent|automation|onboarding|claude[ _-]?code|claude-code)/i)
@@ -108,9 +113,8 @@ function parseCodexSession(file: string, titles: Map<string, string>, now: numbe
   }
 
   let meta: any = null;
-  let minTs = Infinity;
-  let maxTs = -Infinity;
-  const prompts: string[] = [];
+  const structuredTurns: TranscriptTurn[] = [];
+  const legacyUserTurns: TranscriptTurn[] = [];
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     let record: any;
@@ -120,46 +124,90 @@ function parseCodexSession(file: string, titles: Map<string, string>, now: numbe
       continue;
     }
     if (record.type === "session_meta" && !meta) meta = record;
-    if (typeof record.timestamp === "string") {
-      const timestamp = Date.parse(record.timestamp);
-      if (!Number.isNaN(timestamp)) {
-        minTs = Math.min(minTs, timestamp);
-        maxTs = Math.max(maxTs, timestamp);
+    const timestamp = typeof record.timestamp === "string"
+      ? Date.parse(record.timestamp)
+      : Number.NaN;
+    if (Number.isNaN(timestamp)) continue;
+
+    if (record.type === "response_item" && record.payload?.type === "message") {
+      const payload = record.payload;
+      if (payload.role === "user") {
+        const text = messageText(
+          payload.content,
+          new Set(["input_text", "text"]),
+        ).trim();
+        if (meaningfulUserText(text)) {
+          structuredTurns.push({ role: "user", text, timestamp });
+        }
+      } else if (
+        payload.role === "assistant" &&
+        payload.phase === "final_answer"
+      ) {
+        const text = messageText(
+          payload.content,
+          new Set(["output_text", "text"]),
+        ).trim();
+        if (meaningfulAssistantText(text)) {
+          structuredTurns.push({ role: "assistant", text, timestamp });
+        }
       }
     }
+
     if (record.type === "event_msg" && record.payload?.type === "user_message") {
-      const text = userText(record.payload.message ?? record.payload.content).trim();
-      if (meaningfulPrompt(text)) prompts.push(text);
+      const text = messageText(
+        record.payload.message ?? record.payload.content,
+        new Set(["input_text", "text"]),
+      ).trim();
+      if (meaningfulUserText(text)) {
+        legacyUserTurns.push({ role: "user", text, timestamp });
+      }
     }
   }
 
   const id = meta?.payload?.id ?? meta?.payload?.session_id;
   const cwd = meta?.payload?.cwd;
   if (typeof id !== "string" || !id || typeof cwd !== "string" || !cwd) return null;
-  if (excludedSession(meta) || maxTs === -Infinity || now - maxTs > WINDOW_MS || maxTs - now > 5 * 60_000) return null;
+  const turns = structuredTurns.length > 0
+    ? structuredTurns
+    : legacyUserTurns;
+  if (excludedSession(meta) || turns.length === 0) return null;
+
+  const dedupedTurns = turns.filter((turn, index) => {
+    const previous = turns[index - 1];
+    return !previous ||
+      previous.role !== turn.role ||
+      previous.text !== turn.text ||
+      previous.timestamp !== turn.timestamp;
+  });
+  const minTs = Math.min(...dedupedTurns.map((turn) => turn.timestamp));
+  const maxTs = Math.max(...dedupedTurns.map((turn) => turn.timestamp));
+  if (now - maxTs > WINDOW_MS || maxTs - now > 5 * 60_000) return null;
+
   const project = projectFromCwd(cwd);
-  const firstPrompt = prompts[0] ?? "";
+  const firstPrompt = dedupedTurns.find((turn) => turn.role === "user")?.text ?? "";
   const title = titles.get(id) || truncate(firstPrompt, 70) || "(untitled Codex session)";
   const summary = [
     "Codex session",
     `Project: ${project}`,
     `Title: ${title}`,
-    firstPrompt ? `First ask: ${truncate(firstPrompt, 240)}` : "",
+    `${dedupedTurns.length} visible conversation turn(s)`,
   ].filter(Boolean).join("\n");
   return {
-    promptCount: prompts.length,
+    turnCount: dedupedTurns.length,
     source: {
       id: `session:codex:${id}`,
       kind: "session",
       title,
       summary,
       project,
-      detail: prompts.length
-        ? prompts.slice(0, 3).map((prompt) => truncate(prompt, 180))
-        : [title],
-      startTs: minTs === Infinity ? maxTs : minTs,
+      detail: dedupedTurns.map((turn) =>
+        `${turn.role === "user" ? "User" : "Agent"}: ${truncate(turn.text, 240)}`
+      ),
+      startTs: minTs,
       endTs: maxTs,
       weight: 1,
+      transcript: dedupedTurns,
+      sessionProvider: "codex",
     },
   };
 }
@@ -181,8 +229,8 @@ export function extractCodexSessions(
     if (!candidate) continue;
     const previous = sessions.get(candidate.source.id);
     // Prefer a more complete copy, then the latest copy when completeness ties.
-    if (!previous || candidate.promptCount > previous.promptCount ||
-      (candidate.promptCount === previous.promptCount && candidate.source.endTs > previous.source.endTs)) {
+    if (!previous || candidate.turnCount > previous.turnCount ||
+      (candidate.turnCount === previous.turnCount && candidate.source.endTs > previous.source.endTs)) {
       sessions.set(candidate.source.id, candidate);
     }
   }
