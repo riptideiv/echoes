@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Echoes of the Week",
+  title: "Echoes Report",
   description: "Blog & LinkedIn post ideas mined from your week",
 };
 

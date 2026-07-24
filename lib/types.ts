@@ -1,5 +1,11 @@
 import type { Tag } from "./config";
 
+export interface TranscriptTurn {
+  role: "user" | "assistant";
+  text: string;
+  timestamp: number;
+}
+
 /** An atomic unit of activity: one Claude/Codex session or one browsing cluster. */
 export interface Source {
   id: string; // stable id: "session:<claudeId>", "session:codex:<id>", or "web:<slug>"
@@ -11,6 +17,11 @@ export interface Source {
   startTs: number; // epoch ms
   endTs: number; // epoch ms
   weight: number; // volume signal (session count-equivalent / visit count)
+  /** Content revision used by the tag and theme caches. */
+  revision?: string;
+  /** Present only between extraction and the cached session-digest stage. */
+  transcript?: TranscriptTurn[];
+  sessionProvider?: "claude" | "codex";
 }
 
 export interface TaggedSource extends Source {
@@ -19,7 +30,7 @@ export interface TaggedSource extends Source {
 
 /** A group of sources sharing a dominant tag. */
 export interface Theme {
-  sourceKey: string; // sha256 of sorted member source ids — the cache unit
+  sourceKey: string; // sha256 of tag plus sorted member source revisions
   tag: Tag;
   sources: TaggedSource[];
 }
