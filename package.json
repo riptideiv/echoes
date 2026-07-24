@@ -1,7 +1,17 @@
 {
-  "name": "echoes-report",
+  "name": "@riptideiv/echoes-report",
+  "description": "A dashboard for weekly reports on what you've been building",
+  "repository": "https://github.com/riptideiv/echoes-report",
+  "author": "riptideiv",
+  "keywords": [
+    "larp",
+    "dashboard",
+    "weekly",
+    "linkedin",
+    "ai-agents",
+    "browser-history"
+  ],
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "bin": {
     "echoes-report": "dist/cli/echoes-report.mjs"
@@ -13,6 +23,9 @@
     "LICENSES",
     "THIRD_PARTY_NOTICES.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "npm run build:web && npm run stage:web && npm run build:cli",
@@ -31,6 +44,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
+    "@riptideiv/echoes-report": "^0.1.0",
     "better-sqlite3": "^11.8.1",
     "next": "^15.1.6",
     "react": "^19.0.0",
