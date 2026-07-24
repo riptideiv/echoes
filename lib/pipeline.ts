@@ -1,4 +1,5 @@
 import { extractAllSources } from "./extract";
+import { prepareSessionSources } from "./session-digest";
 import { tagSources } from "./tag";
 import { clusterByTag } from "./cluster";
 import { generateIdeasForTheme, generateShortIdeasForTheme } from "./generate";
@@ -36,7 +37,8 @@ export async function runDailyPipeline(): Promise<RunReport> {
   const llmCallsBefore = llmCallCount();
   const errors: string[] = [];
 
-  const sources = extractAllSources();
+  const extracted = extractAllSources();
+  const sources = await prepareSessionSources(extracted);
   const tagged = await tagSources(sources);
   const themes = clusterByTag(tagged);
 

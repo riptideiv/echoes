@@ -15,6 +15,12 @@ interface TagResponse {
   tags: Record<string, string[]>; // sourceId -> tags
 }
 
+export function sourceTagCacheId(
+  source: Pick<Source, "id" | "revision">,
+): string {
+  return source.revision ? `${source.id}@${source.revision}` : source.id;
+}
+
 function sanitize(tags: unknown): Tag[] {
   if (!Array.isArray(tags)) return ["misc"];
   const clean = tags
@@ -34,7 +40,8 @@ export async function tagSources(sources: Source[]): Promise<TaggedSource[]> {
   const todo: Source[] = [];
 
   for (const s of sources) {
-    const cached = getCachedTags(s.id);
+    const cacheId = sourceTagCacheId(s);
+    const cached = getCachedTags(cacheId);
     if (cached) result.push({ ...s, tags: cached });
     else todo.push(s);
   }
@@ -69,7 +76,8 @@ ${items}`;
       const raw = parsed?.tags?.[`item_${i}`];
       const tags = sanitize(raw);
       const tagged: TaggedSource = { ...s, tags };
-      saveSourceTags(tagged);
+      const cacheId = sourceTagCacheId(s);
+      saveSourceTags(tagged, cacheId);
       result.push(tagged);
     });
   }
