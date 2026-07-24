@@ -2,19 +2,21 @@ import crypto from "crypto";
 import type { Tag } from "./config";
 import type { TaggedSource, Theme } from "./types";
 
-function sourceKey(ids: string[]): string {
-  const sorted = [...ids].sort();
+function sourceKey(tag: Tag, sources: TaggedSource[]): string {
+  const sorted = sources
+    .map((source) => `${source.id}@${source.revision ?? "stable"}`)
+    .sort();
   return crypto
     .createHash("sha256")
-    .update(sorted.join("|"))
+    .update(`${tag}|${sorted.join("|")}`)
     .digest("hex")
     .slice(0, 16);
 }
 
 /**
  * Group tagged sources into themes by shared tag. A source with multiple tags
- * joins multiple themes. Grouping is pure code over the (cached, immutable)
- * tags, so a theme's `sourceKey` is stable unless its membership changes.
+ * joins multiple themes. Grouping is pure code over cached tags. A theme's
+ * `sourceKey` changes with its tag, membership, or a member content revision.
  *
  * Themes need at least one session source (a real "thing you did") and >= 2
  * members, so a lone browsing rollup doesn't become a card on its own.
@@ -37,7 +39,7 @@ export function clusterByTag(sources: TaggedSource[]): Theme[] {
       // A single distinctive session may still stand alone as its own theme.
       if (members.length === 1 && members[0].kind === "session") {
         themes.push({
-          sourceKey: sourceKey(members.map((m) => m.id)),
+          sourceKey: sourceKey(tag, members),
           tag,
           sources: members,
         });
@@ -52,7 +54,7 @@ export function clusterByTag(sources: TaggedSource[]): Theme[] {
       return b.endTs - a.endTs;
     });
     themes.push({
-      sourceKey: sourceKey(ordered.map((m) => m.id)),
+      sourceKey: sourceKey(tag, ordered),
       tag,
       sources: ordered,
     });

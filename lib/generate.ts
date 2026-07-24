@@ -66,7 +66,7 @@ function themeDigest(theme: Theme): string {
     lines.push(
       `• [${s.kind}] ${s.title}${s.project ? ` (project: ${s.project})` : ""}`
     );
-    for (const d of s.detail.slice(0, 4)) lines.push(`    - ${d}`);
+    for (const d of s.detail) lines.push(`    - ${d}`);
   }
   return lines.join("\n");
 }
